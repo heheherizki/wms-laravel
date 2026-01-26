@@ -118,6 +118,14 @@
                 <span x-show="isExpanded" x-cloak class="text-sm font-medium whitespace-nowrap">Pengiriman</span>
                 <div x-show="!isExpanded" x-cloak class="fixed left-16 ml-2 bg-slate-900 text-white text-xs px-2 py-1.5 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[60] pointer-events-none border border-slate-700">Pengiriman</div>
             </a>
+            <a href="{{ route('returns.index') }}" 
+                class="flex items-center gap-3 py-2.5 rounded-lg transition-colors group relative shrink-0 {{ request()->routeIs('returns.*') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}"
+                :class="isExpanded ? 'px-3' : 'w-10 justify-center px-0'">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                    
+                <span x-show="isExpanded" x-cloak class="text-sm font-medium whitespace-nowrap">Retur Penjualan</span>
+                <div x-show="!isExpanded" x-cloak class="fixed left-16 ml-2 bg-slate-900 text-white text-xs px-2 py-1.5 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[60] pointer-events-none border border-slate-700">Retur</div>
+            </a>
 
             <div x-show="isExpanded" x-cloak class="mt-6 mb-2 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
                 Keuangan

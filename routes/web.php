@@ -99,6 +99,19 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/invoices/{id}/print', 'print')->name('invoices.print');
     });
 
+    // --- SALES RETURN (RETUR PENJUALAN) ---
+    Route::resource('returns', \App\Http\Controllers\SalesReturnController::class);
+
+    // API Helper untuk Retur (Ambil produk shipped per SO)
+    Route::get('/returns/{id}/print', [\App\Http\Controllers\SalesReturnController::class, 'print'])->name('returns.print');
+    Route::get('/api/sales/{id}/shipped-items', [\App\Http\Controllers\SalesReturnController::class, 'getShippedProducts']);
+    
+    // Route khusus untuk Approve/Reject (Hanya Admin yang boleh)
+    Route::middleware(['admin'])->group(function () {
+        Route::patch('/returns/{id}/approve', [\App\Http\Controllers\SalesReturnController::class, 'approve'])->name('returns.approve');
+        Route::patch('/returns/{id}/reject', [\App\Http\Controllers\SalesReturnController::class, 'reject'])->name('returns.reject');
+    });
+
 
     // =====================================================================
     // 3. ADMIN ONLY ZONE (SENSITIVE ACTIONS)
