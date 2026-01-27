@@ -14,4 +14,22 @@ class Invoice extends Model
     public function shipment() { return $this->belongsTo(Shipment::class); }
     public function salesOrder() { return $this->belongsTo(SalesOrder::class); }
     public function details() { return $this->hasMany(InvoiceDetail::class); }
+
+    // Relasi ke Payment
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    // Helper: Hitung Total yang Sudah Dibayar
+    public function getTotalPaidAttribute()
+    {
+        return $this->payments->sum('amount');
+    }
+
+    // Helper: Hitung Sisa Tagihan (Balance Due)
+    public function getRemainingBalanceAttribute()
+    {
+        return $this->total_amount - $this->total_paid;
+    }
 }

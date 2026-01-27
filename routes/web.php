@@ -97,6 +97,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/invoices', 'index')->name('invoices.index');
         Route::post('/shipments/{id}/create-invoice', 'createFromShipment')->name('invoices.createFromShipment');
         Route::get('/invoices/{id}/print', 'print')->name('invoices.print');
+        Route::get('/invoices/{id}', 'show')->name('invoices.show');
     });
 
     // --- SALES RETURN (RETUR PENJUALAN) ---
@@ -111,6 +112,14 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('/returns/{id}/approve', [\App\Http\Controllers\SalesReturnController::class, 'approve'])->name('returns.approve');
         Route::patch('/returns/{id}/reject', [\App\Http\Controllers\SalesReturnController::class, 'reject'])->name('returns.reject');
     });
+
+    // --- PAYMENTS (PEMBAYARAN) ---
+    Route::get('/invoices/{id}/payment/create', [\App\Http\Controllers\PaymentController::class, 'create'])->name('payments.create');
+    Route::post('/payments', [\App\Http\Controllers\PaymentController::class, 'store'])->name('payments.store');
+    Route::get('/payments/{id}/print', [\App\Http\Controllers\PaymentController::class, 'print'])->name('payments.print');
+    
+    // Admin Only Delete Payment
+    Route::middleware(['admin'])->delete('/payments/{id}', [\App\Http\Controllers\PaymentController::class, 'destroy'])->name('payments.destroy');
 
 
     // =====================================================================

@@ -91,4 +91,11 @@ class InvoiceController extends Controller
         
         return $pdf->stream($filename);
     }
+
+    public function show($id)
+    {
+        // Load invoice beserta relasi yang dibutuhkan di view
+        $invoice = Invoice::with(['salesOrder.customer', 'salesOrder.user', 'details.product', 'payments.user'])->findOrFail($id);
+        return view('invoices.show', compact('invoice'));
+    }
 }
