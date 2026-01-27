@@ -17,4 +17,9 @@ class Customer extends Model
         'email',
         'payment_terms',
     ];
+
+    public function salesOrders()
+    {
+        return $this->hasMany(SalesOrder::class);
+    }
 }

@@ -12,6 +12,8 @@ use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\TransactionExport;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
+use App\Models\Customer;
 
 class ReportController extends Controller
 {
@@ -126,5 +128,68 @@ class ReportController extends Controller
 
         // Return Query Builder (Tanpa ->get())
         return $query->oldest();
+    }
+
+    // LAPORAN PIUTANG (AR AGING)
+    public function accountsReceivable()
+    {
+        // Ambil customer yang punya invoice BELUM LUNAS (Partial / Unpaid)
+        $customers = Customer::whereHas('salesOrders.invoices', function($q) {
+            $q->whereIn('status', ['unpaid', 'partial']);
+        })->with(['salesOrders.invoices' => function($q) {
+            $q->whereIn('status', ['unpaid', 'partial']);
+        }])->get();
+
+        $report = $customers->map(function($customer) {
+            $invoices = $customer->salesOrders->flatMap->invoices;
+            
+            // Inisialisasi Bucket
+            $data = [
+                'customer_id' => $customer->id,
+                'name' => $customer->name,
+                'total_debt' => 0,
+                'not_due' => 0,    // Belum jatuh tempo
+                'days_0_30' => 0,  // Lewat 0-30 hari
+                'days_31_60' => 0, // Lewat 31-60 hari
+                'days_61_plus' => 0 // Lewat > 60 hari
+            ];
+
+            foreach ($invoices as $inv) {
+                // Hitung sisa tagihan per invoice (Total - Paid)
+                // Kita gunakan helper attribute yang sudah dibuat di Model Invoice
+                $balance = $inv->remaining_balance; 
+                
+                if ($balance <= 0) continue; // Skip jika lunas (safety check)
+
+                $data['total_debt'] += $balance;
+                $dueDate = Carbon::parse($inv->due_date);
+                $now = Carbon::now();
+
+                if ($now->lte($dueDate)) {
+                    // Belum Jatuh Tempo
+                    $data['not_due'] += $balance;
+                } else {
+                    // Sudah Jatuh Tempo, hitung selisih hari
+                    $diff = $dueDate->diffInDays($now);
+
+                    if ($diff <= 30) {
+                        $data['days_0_30'] += $balance;
+                    } elseif ($diff <= 60) {
+                        $data['days_31_60'] += $balance;
+                    } else {
+                        $data['days_61_plus'] += $balance;
+                    }
+                }
+            }
+
+            return (object) $data;
+        });
+
+        // Filter: Hanya tampilkan yang punya hutang
+        $report = $report->where('total_debt', '>', 0);
+        
+        $grandTotal = $report->sum('total_debt');
+
+        return view('reports.receivables', compact('report', 'grandTotal'));
     }
 }

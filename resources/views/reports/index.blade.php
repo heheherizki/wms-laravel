@@ -30,5 +30,13 @@
             <p class="text-sm text-slate-500 mt-2">Rekapitulasi omzet penjualan dan performa sales order.</p>
         </a>
 
+        <a href="{{ route('reports.receivables') }}" class="block p-6 bg-white border border-slate-200 rounded-xl hover:shadow-lg hover:border-red-500 transition-all group">
+            <div class="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center text-red-600 mb-4 group-hover:bg-red-600 group-hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 group-hover:text-red-600">Laporan Piutang (AR Aging)</h3>
+            <p class="text-sm text-slate-500 mt-2">Monitoring umur hutang customer (Belum Jatuh Tempo s/d Macet).</p>
+        </a>
+
     </div>
 </x-app-layout>

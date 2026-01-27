@@ -157,6 +157,9 @@ Route::middleware(['auth'])->group(function () {
             // Export Actions
             Route::get('/reports/export/excel', 'exportExcel')->name('reports.export_excel');
             Route::get('/reports/export/pdf', 'exportPdf')->name('reports.export_pdf');
+
+            // Laporan Piutang
+            Route::get('/reports/receivables', 'accountsReceivable')->name('reports.receivables');
         });
 
     }); // End Admin Middleware

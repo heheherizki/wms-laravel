@@ -34,4 +34,9 @@ class SalesOrder extends Model
     {
         return $this->hasMany(Shipment::class);
     }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
 }
