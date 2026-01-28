@@ -104,6 +104,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/invoices/{id}', 'show')->name('invoices.show');
     });
 
+    // Customer Statement
+    Route::get('/customers/{id}/statement', [\App\Http\Controllers\StatementController::class, 'index'])->name('customers.statement');
+
     // --- SALES RETURN (RETUR PENJUALAN) ---
     Route::resource('returns', \App\Http\Controllers\SalesReturnController::class);
 
