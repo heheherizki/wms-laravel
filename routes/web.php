@@ -82,6 +82,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/sales/{id}/print-so', 'printSo')->name('sales.print_so'); // Picking List
         // Route print invoice/shipment lama bisa dihapus jika sudah pindah ke modul baru,
         // atau dibiarkan untuk kompatibilitas data lama.
+    
+    // Route untuk cek ulang status per Order
+    Route::patch('/sales/{id}/refresh', [\App\Http\Controllers\SalesOrderController::class, 'refreshStatus'])->name('sales.refresh');    
+
     });
 
     // --- SHIPMENT (PENGIRIMAN PARTIAL) ---
@@ -161,6 +165,11 @@ Route::middleware(['auth'])->group(function () {
             // Laporan Piutang
             Route::get('/reports/receivables', 'accountsReceivable')->name('reports.receivables');
         });
+
+        // Open Hold Sales Order
+        Route::patch('/sales/{id}/approve', [\App\Http\Controllers\SalesOrderController::class, 'approve'])->name('sales.approve');
+
+        Route::patch('/customers/{id}/unlock', [\App\Http\Controllers\CustomerController::class, 'unlock'])->name('customers.unlock');
 
     }); // End Admin Middleware
 

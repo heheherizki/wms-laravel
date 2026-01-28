@@ -6,12 +6,15 @@ use App\Models\SalesOrder;
 use App\Models\Shipment;
 use App\Models\ShipmentDetail;
 use App\Models\Product;
+use App\Models\Transaction; // Pastikan Model Transaction di-import
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ShipmentController extends Controller
 {
+    // 1. LIST PENGIRIMAN
     public function index(Request $request)
     {
         $query = Shipment::with(['salesOrder.customer', 'user']);
@@ -26,15 +29,41 @@ class ShipmentController extends Controller
         return view('shipments.index', compact('shipments'));
     }
 
-    // 1. FORM PENGIRIMAN (Berdasarkan SO ID)
+    // 2. FORM PENGIRIMAN (GATEKEEPER)
     public function create($salesOrderId)
     {
         $so = SalesOrder::with(['details.product', 'customer'])->findOrFail($salesOrderId);
 
-        // Validasi: Kalau sudah selesai dikirim semua, tolak.
         if ($so->status == 'shipped') {
-            return back()->with('error', 'Order ini sudah dikirim sepenuhnya.');
+            return back()->with('error', 'Order sudah dikirim.');
         }
+
+        // === LOGIKA BARU: CEK IZIN CUSTOMER ===
+        
+        // Cek apakah CUSTOMER punya izin sakti? (Bukan SO nya lagi)
+        $isAuthorized = $so->customer->authorized_until && now()->lt($so->customer->authorized_until);
+
+        // Jika Customer TIDAK punya izin, baru cek kesehatan keuangannya
+        if (!$isAuthorized) {
+            
+            // 1. Cek Overdue
+            if ($so->customer->hasOverdueInvoices()) {
+                $so->update(['status' => 'on_hold']); 
+                return redirect()->route('sales.show', $so->id)
+                    ->with('error', 'BLOKIR: Customer memiliki invoice overdue. Silakan Unlock Customer di menu Data Customer.');
+            }
+
+            // 2. Cek Limit
+            if ($so->customer->credit_limit > 0 && $so->payment_status != 'paid') {
+                $exposure = $so->customer->current_debt + $so->grand_total;
+                if ($exposure > $so->customer->credit_limit) {
+                    $so->update(['status' => 'on_hold']);
+                    return redirect()->route('sales.show', $so->id)
+                        ->with('error', 'BLOKIR: Over Credit Limit. Silakan Unlock Customer di menu Data Customer.');
+                }
+            }
+        }
+        // --- END GATEKEEPER ---
 
         // Generate No Surat Jalan: SJ-YYYYMM-XXXX
         $lastShipment = Shipment::latest()->first();
@@ -44,13 +73,14 @@ class ShipmentController extends Controller
         return view('shipments.create', compact('so', 'sjNumber'));
     }
 
-    // 2. PROSES SIMPAN PENGIRIMAN (LOGIKA PARTIAL)
+    // 3. PROSES SIMPAN (POTONG STOK & UPDATE SO)
     public function store(Request $request, $salesOrderId)
     {
         $so = SalesOrder::with('details')->findOrFail($salesOrderId);
 
         $request->validate([
             'date' => 'required|date',
+            'shipment_number' => 'required|unique:shipments,shipment_number',
             'items' => 'required|array', // Array: product_id => qty_to_ship
         ]);
 
@@ -69,12 +99,20 @@ class ShipmentController extends Controller
 
             // B. Loop Barang yang mau dikirim
             foreach ($request->items as $productId => $qtyToShip) {
-                // Skip jika qty 0 atau kosong
+                
+                // Pastikan qty integer (untuk keamanan)
+                $qtyToShip = (int) $qtyToShip;
+
+                // Skip jika qty 0 atau negatif
                 if ($qtyToShip <= 0) continue;
 
                 // Ambil Detail SO terkait produk ini
                 $soDetail = $so->details->where('product_id', $productId)->first();
                 $product = Product::findOrFail($productId);
+
+                if (!$soDetail) {
+                    throw new \Exception("Produk ID {$productId} tidak ditemukan dalam pesanan ini.");
+                }
 
                 // Validasi 1: Jangan kirim melebihi pesanan
                 $remainingQty = $soDetail->quantity - $soDetail->shipped_quantity;
@@ -89,12 +127,10 @@ class ShipmentController extends Controller
 
                 // C. EKSEKUSI PENGURANGAN STOK
                 // 1. Kurangi Stok Fisik
-                $product->stock -= $qtyToShip;
-                $product->save();
+                $product->decrement('stock', $qtyToShip); // Cara lebih aman concurrency daripada $p->stock -=
 
                 // 2. Update Progress di SO Detail
-                $soDetail->shipped_quantity += $qtyToShip;
-                $soDetail->save();
+                $soDetail->increment('shipped_quantity', $qtyToShip);
 
                 // 3. Simpan Detail Shipment
                 ShipmentDetail::create([
@@ -103,29 +139,30 @@ class ShipmentController extends Controller
                     'quantity' => $qtyToShip,
                 ]);
 
-                // 4. Catat Kartu Stok (History)
-                \App\Models\Transaction::create([
+                // 4. Catat Kartu Stok (History Log)
+                Transaction::create([
                     'product_id' => $productId,
                     'user_id' => Auth::id(),
                     'type' => 'out',
                     'quantity' => $qtyToShip,
-                    'reference' => $shipment->shipment_number, // Referensi ke SJ, bukan SO
-                    'notes' => 'Pengiriman atas ' . $so->so_number,
+                    'reference' => $shipment->shipment_number, // Referensi ke SJ
+                    'notes' => 'Pengiriman Pesanan: ' . $so->so_number,
                 ]);
 
                 $totalShippedInThisSession++;
             }
 
             if ($totalShippedInThisSession == 0) {
-                throw new \Exception("Tidak ada barang yang dikirim. Mohon isi jumlah kirim.");
+                throw new \Exception("Tidak ada barang yang dikirim. Mohon isi jumlah kirim minimal satu barang.");
             }
 
             // D. Cek Status Akhir SO (Apakah Partial atau Full?)
             $allCompleted = true;
-            $so->refresh(); // Refresh data terbaru
+            $so->refresh(); // Refresh data terbaru dari DB setelah update quantity
+            
             foreach ($so->details as $detail) {
                 if ($detail->shipped_quantity < $detail->quantity) {
-                    $allCompleted = false; // Masih ada sisa
+                    $allCompleted = false; // Masih ada sisa yang belum dikirim
                     break;
                 }
             }
@@ -134,19 +171,23 @@ class ShipmentController extends Controller
             $so->update(['status' => $allCompleted ? 'shipped' : 'partial']);
         });
 
-        return redirect()->route('sales.show', $salesOrderId)->with('success', 'Pengiriman berhasil dibuat! Stok berkurang.');
+        return redirect()->route('sales.show', $salesOrderId)
+            ->with('success', 'Pengiriman berhasil dibuat! Stok gudang telah dikurangi.');
     }
 
-    // 3. PRINT SURAT JALAN (Berdasarkan Shipment ID)
+    // 4. CETAK SURAT JALAN (PDF)
     public function print($id)
     {
-        $shipment = Shipment::with(['salesOrder.customer', 'details.product', 'user'])->findOrFail($id);
+        // Load shipment beserta relasinya
+        $shipment = Shipment::with([
+            'salesOrder.customer', 
+            'details.product', 
+            'user'
+        ])->findOrFail($id);
         
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('shipments.print', compact('shipment'));
-        $pdf->setPaper('a4', 'portrait');
+        $pdf = Pdf::loadView('shipments.print', compact('shipment'));
+        $pdf->setPaper('a5', 'landscape'); // Ukuran A5 Landscape (Standar Surat Jalan)
+        
         return $pdf->stream('SJ-' . $shipment->shipment_number . '.pdf');
-
-        $filename = 'SJ-' . str_replace('/', '-', $shipment->shipment_number) . '.pdf';
-        return $pdf->stream($filename);
     }
 }

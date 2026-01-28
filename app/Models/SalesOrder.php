@@ -11,7 +11,7 @@ class SalesOrder extends Model
 
     protected $fillable = [
         'so_number', 'customer_id', 'user_id', 'date', 
-        'status', 'payment_status', 'grand_total', 'notes'
+        'status', 'payment_status', 'grand_total', 'notes', 'authorized_until',
     ];
 
     public function details()
@@ -39,4 +39,9 @@ class SalesOrder extends Model
     {
         return $this->hasMany(Invoice::class);
     }
+
+    protected $casts = [
+        'date' => 'date',
+        'authorized_until' => 'datetime', // <--- PENTING: Agar fungsi jam (diffInMinutes) jalan
+    ];
 }
