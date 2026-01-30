@@ -10,16 +10,19 @@ class PurchaseDetail extends Model
     use HasFactory;
 
     protected $fillable = [
-        'purchase_id', 'product_id', 'quantity', 'buy_price', 'subtotal'
+        'purchase_id',
+        'product_id',
+        'quantity',
+        'quantity_received',
+        'buy_price', // <--- Pastikan ini buy_price (sesuai DB Anda)
+        'subtotal',
     ];
 
-    // Relasi Balik: Detail milik PO
     public function purchase()
     {
         return $this->belongsTo(Purchase::class);
     }
 
-    // Relasi: Detail adalah Produk tertentu
     public function product()
     {
         return $this->belongsTo(Product::class);

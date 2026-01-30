@@ -104,6 +104,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/invoices/{id}', 'show')->name('invoices.show');
     });
 
+    // Route Bayar Hutang Supplier
+    Route::get('/purchases/{id}/pay', [App\Http\Controllers\PurchasePaymentController::class, 'create'])->name('purchases.pay');
+    Route::post('/purchases/pay', [App\Http\Controllers\PurchasePaymentController::class, 'store'])->name('purchases.payment.store');
+    Route::get('/purchases/payments/{id}/print', [App\Http\Controllers\PurchasePaymentController::class, 'print'])->name('purchases.payments.print');
+    // Route Terima Barang (Partial)
+    Route::get('/purchases/{id}/receive', [App\Http\Controllers\PurchaseController::class, 'receive'])->name('purchases.receive');
+    Route::post('/purchases/{id}/receive', [App\Http\Controllers\PurchaseController::class, 'processReceive'])->name('purchases.receive.store');
+
     // Customer Statement
     Route::get('/customers/{id}/statement', [\App\Http\Controllers\StatementController::class, 'index'])->name('customers.statement');
 
@@ -167,6 +175,10 @@ Route::middleware(['auth'])->group(function () {
 
             // Laporan Piutang
             Route::get('/reports/receivables', 'accountsReceivable')->name('reports.receivables');
+
+            // Hutang (AP) --> INI YANG BARU KITA INTEGRASIKAN
+            Route::get('/debt', [App\Http\Controllers\ReportController::class, 'accountsPayable'])->name('reports.debt.index');
+            Route::get('/debt/print', [App\Http\Controllers\ReportController::class, 'accountsPayablePrint'])->name('reports.debt.print');
         });
 
         // Open Hold Sales Order
