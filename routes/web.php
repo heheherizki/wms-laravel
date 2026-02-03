@@ -74,6 +74,14 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('/purchases/{id}/complete', 'markAsCompleted')->name('purchases.complete');
         Route::get('/purchases/{id}/print', 'print')->name('purchases.print');
     });
+    Route::get('/reports/statement', [App\Http\Controllers\ReportController::class, 'supplierStatement'])->name('reports.statement');
+
+    // RETUR PEMBELIAN (PURCHASE RETURN)
+    Route::resource('purchase_returns', App\Http\Controllers\PurchaseReturnController::class);
+    Route::patch('/purchase_returns/{id}/approve', [App\Http\Controllers\PurchaseReturnController::class, 'approve'])->name('purchase_returns.approve');
+    Route::patch('/purchase_returns/{id}/reject', [App\Http\Controllers\PurchaseReturnController::class, 'reject'])->name('purchase_returns.reject');
+    Route::get('/purchase_returns/{id}/print', [App\Http\Controllers\PurchaseReturnController::class, 'print'])->name('purchase_returns.print');
+    Route::get('/api/purchases/{id}/items', [App\Http\Controllers\PurchaseReturnController::class, 'getReceivedProducts']); // API untuk Form
 
     // --- SALES (PENJUALAN / SO) ---
     Route::resource('sales', SalesOrderController::class);

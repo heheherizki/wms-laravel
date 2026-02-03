@@ -51,5 +51,14 @@
             <p class="text-sm text-slate-500 mt-2">Monitoring kewajiban pembayaran ke supplier dan jatuh tempo.</p>
         </a>
 
+        {{-- 6. SUPPLIER STATEMENT (SOA) --}}
+        <a href="{{ route('reports.statement') }}" class="block p-6 bg-white border border-slate-200 rounded-xl hover:shadow-lg hover:border-violet-500 transition-all group">
+            <div class="w-12 h-12 bg-violet-50 rounded-lg flex items-center justify-center text-violet-600 mb-4 group-hover:bg-violet-600 group-hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 group-hover:text-violet-600">Supplier Statement (SOA)</h3>
+            <p class="text-sm text-slate-500 mt-2">Kartu riwayat detail hutang supplier (Rekening Koran).</p>
+        </a>
+
     </div>
 </x-app-layout>

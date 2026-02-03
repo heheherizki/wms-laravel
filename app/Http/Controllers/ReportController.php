@@ -143,7 +143,7 @@ class ReportController extends Controller
         return view('reports.receivables', compact('report', 'grandTotal'));
     }
 
-    // 8. LAPORAN HUTANG (AP AGING) - [BARU DITAMBAHKAN]
+    // 8. LAPORAN HUTANG (AP AGING) - [REVISI]
     public function accountsPayable()
     {
         // Ambil Supplier yang punya PO belum lunas
@@ -160,33 +160,33 @@ class ReportController extends Controller
                 'supplier_id' => $supplier->id,
                 'name' => $supplier->name,
                 'phone' => $supplier->phone,
-                'term_days' => $supplier->term_days,
+                'term_days' => $supplier->term_days ?? 0, // Default 0 jika null
                 'total_debt' => 0,
-                'not_due' => 0,      // Belum jatuh tempo
-                'days_0_30' => 0,    // Telat 0-30 hari
-                'days_31_60' => 0,   // Telat 31-60 hari
-                'days_61_plus' => 0  // Telat > 60 hari
+                'not_due' => 0,      
+                'days_0_30' => 0,    
+                'days_31_60' => 0,   
+                'days_61_plus' => 0  
             ];
 
             foreach ($supplier->purchases as $po) {
+                // PERBAIKAN: Gunakan 'total_amount' (bukan grand_total)
                 // Hitung sisa hutang per PO
                 $balance = $po->total_amount - $po->amount_paid;
                 
-                if ($balance <= 0) continue;
+                // Skip jika sudah lunas (balance <= 0)
+                // Gunakan toleransi kecil untuk float
+                if ($balance <= 1) continue;
 
                 $data['total_debt'] += $balance;
                 
-                // Hitung Jatuh Tempo Berdasarkan Term Supplier
-                // Tgl PO + Term Days = Jatuh Tempo
+                // Hitung Jatuh Tempo
                 $poDate = Carbon::parse($po->date);
-                $dueDate = $poDate->copy()->addDays($supplier->term_days);
+                $dueDate = $poDate->copy()->addDays($data['term_days']);
                 $now = Carbon::now();
 
                 if ($now->lte($dueDate)) {
-                    // Belum Jatuh Tempo
                     $data['not_due'] += $balance;
                 } else {
-                    // Sudah Lewat Jatuh Tempo
                     $diff = $dueDate->diffInDays($now);
 
                     if ($diff <= 30) {
@@ -205,17 +205,12 @@ class ReportController extends Controller
         $suppliers = $report->where('total_debt', '>', 0);
         $grandTotalDebt = $suppliers->sum('total_debt');
 
-        // Kita gunakan view yang sama (debt_index)
         return view('reports.debt_index', compact('suppliers', 'grandTotalDebt'));
     }
 
-    // 9. CETAK PDF HUTANG - [BARU DITAMBAHKAN]
+    // 9. CETAK PDF HUTANG - [REVISI]
     public function accountsPayablePrint()
     {
-        // Logika sama persis dengan accountsPayable, hanya beda return PDF
-        // Sebaiknya diloop ulang atau dipisah ke private method jika ingin DRY (Don't Repeat Yourself)
-        // Tapi untuk kemudahan copy-paste, saya tulis ulang logic-nya di sini:
-
         $suppliers = Supplier::whereHas('purchases', function($q) {
             $q->whereIn('payment_status', ['unpaid', 'partial'])
               ->where('status', '!=', 'canceled');
@@ -227,14 +222,16 @@ class ReportController extends Controller
         $report = $suppliers->map(function($supplier) {
             $totalDebt = 0;
             foreach ($supplier->purchases as $po) {
-                $totalDebt += ($po->total_amount - $po->amount_paid);
+                // PERBAIKAN: Gunakan total_amount
+                $balance = $po->total_amount - $po->amount_paid;
+                if ($balance > 1) { // Toleransi float
+                    $totalDebt += $balance;
+                }
             }
-            // Kita simpan total_debt ke object supplier agar mudah diakses di View PDF
             $supplier->total_debt = $totalDebt;
             return $supplier;
         });
 
-        // Filter supplier yang hutangnya > 0
         $suppliers = $report->filter(function($s) { return $s->total_debt > 0; });
         $grandTotalDebt = $suppliers->sum('total_debt');
 
@@ -242,6 +239,101 @@ class ReportController extends Controller
         $pdf->setPaper('a4', 'portrait');
         
         return $pdf->stream('Laporan-Hutang-'.date('Y-m-d').'.pdf');
+    }
+
+    // 10. FORM & LAPORAN STATEMENT OF ACCOUNT (SOA)
+    public function supplierStatement(Request $request)
+    {
+        $suppliers = Supplier::orderBy('name')->get();
+        
+        // Default: Kosongkan data jika belum ada supplier yang dipilih
+        $statement = collect([]); 
+        $openingBalance = 0;
+        $endingBalance = 0;
+        $selectedSupplier = null;
+
+        if ($request->has('supplier_id') && $request->supplier_id != '') {
+            $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+            $endDate = $request->end_date ?? Carbon::now()->endOfMonth()->format('Y-m-d');
+            $supplierId = $request->supplier_id;
+            
+            $selectedSupplier = Supplier::findOrFail($supplierId);
+
+            // 1. HITUNG SALDO AWAL (OPENING BALANCE)
+            // Semua transaksi SEBELUM startDate
+            
+            // a. Total Tagihan s/d sebelum start date
+            $pastBills = \App\Models\Purchase::where('supplier_id', $supplierId)
+                ->where('status', '!=', 'canceled')
+                ->where('date', '<', $startDate)
+                ->sum('total_amount');
+
+            // b. Total Bayar/Retur s/d sebelum start date
+            // Kita join ke purchase untuk filter by supplier
+            $pastPayments = \App\Models\PurchasePayment::whereHas('purchase', function($q) use ($supplierId) {
+                    $q->where('supplier_id', $supplierId);
+                })
+                ->where('date', '<', $startDate)
+                ->sum('amount');
+
+            $openingBalance = $pastBills - $pastPayments;
+
+            // 2. AMBIL TRANSAKSI PERIODE INI
+            
+            // a. Tagihan Baru (PO)
+            $bills = \App\Models\Purchase::where('supplier_id', $supplierId)
+                ->where('status', '!=', 'canceled')
+                ->whereBetween('date', [$startDate, $endDate])
+                ->get()
+                ->map(function($item) {
+                    return [
+                        'date' => $item->date,
+                        'type' => 'TAGIHAN (PO)',
+                        'ref' => $item->po_number,
+                        'description' => 'Pembelian Barang',
+                        'debit' => 0, // Pembayaran
+                        'credit' => $item->total_amount, // Hutang Bertambah
+                        'original_obj' => $item
+                    ];
+                });
+
+            // b. Pembayaran & Retur
+            $payments = \App\Models\PurchasePayment::whereHas('purchase', function($q) use ($supplierId) {
+                    $q->where('supplier_id', $supplierId);
+                })
+                ->whereBetween('date', [$startDate, $endDate])
+                ->get()
+                ->map(function($item) {
+                    $type = str_contains($item->payment_method, 'Debit') ? 'RETUR / DEBIT NOTE' : 'PEMBAYARAN';
+                    return [
+                        'date' => $item->date,
+                        'type' => $type,
+                        'ref' => 'PAY-' . str_pad($item->id, 5, '0', STR_PAD_LEFT),
+                        'description' => $item->notes ?? $item->payment_method,
+                        'debit' => $item->amount, // Hutang Berkurang
+                        'credit' => 0,
+                        'original_obj' => $item
+                    ];
+                });
+
+            // 3. GABUNG DAN SORTIR BERDASARKAN TANGGAL
+            $statement = $bills->concat($payments)->sortBy(function($item) {
+                return $item['date']; // Sort by date
+            });
+
+            // Hitung Ending Balance untuk display summary
+            $totalCredit = $statement->sum('credit');
+            $totalDebit = $statement->sum('debit');
+            $endingBalance = $openingBalance + $totalCredit - $totalDebit;
+        }
+
+        // Jika request PDF
+        if ($request->has('export') && $request->export == 'pdf') {
+            $pdf = Pdf::loadView('reports.statement_pdf', compact('statement', 'openingBalance', 'endingBalance', 'selectedSupplier', 'request'));
+            return $pdf->stream('SOA-'.$selectedSupplier->name.'.pdf');
+        }
+
+        return view('reports.statement', compact('suppliers', 'statement', 'openingBalance', 'endingBalance', 'selectedSupplier'));
     }
 
     // --- PRIVATE METHODS ---
