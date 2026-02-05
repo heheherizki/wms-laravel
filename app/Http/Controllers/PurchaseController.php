@@ -17,7 +17,10 @@ class PurchaseController extends Controller
     // 1. TAMPILKAN DAFTAR PO
     public function index()
     {
-        $purchases = Purchase::with(['supplier', 'user'])->latest()->get();
+        $purchases = Purchase::with(['supplier', 'user'])
+                        ->latest()
+                        ->paginate(10); 
+
         return view('purchases.index', compact('purchases'));
     }
 
@@ -97,9 +100,12 @@ class PurchaseController extends Controller
     // 4. LIHAT DETAIL PO
     public function show($id)
     {
-        // Load PO dengan Supplier, User, Detail Produk, dan History Pembayaran
-        $purchase = Purchase::with(['supplier', 'user', 'details.product', 'payments.user'])->findOrFail($id);
-        return view('purchases.show', compact('purchase'));
+        $purchase = Purchase::with(['supplier', 'details.product', 'payments.user'])->findOrFail($id);
+        
+        // TAMBAHAN: Ambil data akun keuangan untuk dropdown pembayaran
+        $accounts = \App\Models\CashAccount::orderBy('name')->get(); 
+
+        return view('purchases.show', compact('purchase', 'accounts'));
     }
 
     // 5. EDIT PO (Hanya jika belum ada barang diterima)

@@ -16,6 +16,7 @@ use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\ShipmentController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\PurchasePaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -166,7 +167,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/invoices/{id}/payment/create', [\App\Http\Controllers\PaymentController::class, 'create'])->name('payments.create');
     Route::post('/payments', [\App\Http\Controllers\PaymentController::class, 'store'])->name('payments.store');
     Route::get('/payments/{id}/print', [\App\Http\Controllers\PaymentController::class, 'print'])->name('payments.print');
+    // ROUTE PEMBAYARAN HUTANG (PURCHASE PAYMENTS)
+    // 1. Halaman Form Bayar
+    Route::get('/purchases/{id}/pay', [PurchasePaymentController::class, 'create'])->name('purchases.pay');
     
+    // 2. Proses Simpan Bayar (INI YANG HILANG)
+    Route::post('/purchase-payments', [PurchasePaymentController::class, 'store'])->name('purchase_payments.store');
+
     // Admin Only Delete Payment
     Route::middleware(['admin'])->delete('/payments/{id}', [\App\Http\Controllers\PaymentController::class, 'destroy'])->name('payments.destroy');
 

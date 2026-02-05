@@ -65,7 +65,6 @@
 
                             {{-- KOLOM 3: STATUS BARANG (LOGISTIK) --}}
                             <td class="px-6 py-4 text-center">
-                                {{-- REVISI: Cek status 'completed' (bukan received) --}}
                                 @if($po->status == 'completed')
                                     <div class="inline-flex flex-col items-center justify-center">
                                         <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200 flex items-center gap-1">
@@ -103,8 +102,9 @@
                                         <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200 w-fit">
                                             CICILAN
                                         </span>
-                                        <span class="text-[10px] text-slate-500 mt-1">
-                                            Sisa: Rp {{ number_format($po->grand_total - $po->amount_paid, 0, ',', '.') }}
+                                        {{-- PERBAIKAN: Gunakan total_amount --}}
+                                        <span class="text-[10px] text-red-500 font-bold mt-1">
+                                            Sisa: Rp {{ number_format($po->total_amount - $po->amount_paid, 0, ',', '.') }}
                                         </span>
                                     </div>
                                 @else
@@ -117,7 +117,6 @@
                             {{-- KOLOM 5: TOTAL NILAI --}}
                             <td class="px-6 py-4 text-right">
                                 <div class="font-mono font-bold text-slate-700 text-sm">
-                                    {{-- PERBAIKAN: Gunakan total_amount --}}
                                     Rp {{ number_format($po->total_amount, 0, ',', '.') }}
                                 </div>
                             </td>
@@ -126,24 +125,24 @@
                             <td class="px-6 py-4 text-center">
                                 <div class="flex items-center justify-center gap-2">
                                     
-                                    {{-- 1. TOMBOL DETAIL (Selalu Muncul) --}}
+                                    {{-- 1. TOMBOL DETAIL --}}
                                     <a href="{{ route('purchases.show', $po->id) }}" class="p-2 bg-white border border-slate-200 text-slate-500 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="Lihat Detail & Terima Barang">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                                     </a>
 
-                                    {{-- 2. TOMBOL BAYAR (Jika Belum Lunas & Tidak Batal) --}}
+                                    {{-- 2. TOMBOL BAYAR --}}
                                     @if($po->payment_status != 'paid' && $po->status != 'canceled')
                                         <a href="{{ route('purchases.pay', $po->id) }}" class="p-2 bg-green-50 border border-green-200 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title="Bayar Hutang">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                                         </a>
                                     @endif
 
-                                    {{-- 3. TOMBOL PRINT (Shortcut) --}}
+                                    {{-- 3. TOMBOL PRINT --}}
                                     <a href="{{ route('purchases.print', $po->id) }}" target="_blank" class="p-2 bg-white border border-slate-200 text-slate-500 rounded-lg hover:bg-slate-100 hover:text-slate-800 transition-colors" title="Cetak PDF">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                                     </a>
 
-                                    {{-- 4. DROPDOWN MENU (Edit & Hapus - Hanya jika Pending) --}}
+                                    {{-- 4. DROPDOWN (Edit/Hapus) --}}
                                     @if($po->status == 'pending')
                                         <div x-data="{ open: false }" class="relative">
                                             <button @click="open = !open" @click.away="open = false" class="p-2 bg-white border border-slate-200 text-slate-400 rounded-lg hover:bg-slate-50 hover:text-slate-600 transition-colors">
@@ -179,6 +178,9 @@
                         @endforelse
                     </tbody>
                 </table>
+                <div class="p-4 border-t border-slate-200">
+                    {{ $purchases->links() }}
+                </div>
             </div>
         </div>
     </div>

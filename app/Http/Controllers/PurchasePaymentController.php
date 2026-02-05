@@ -8,64 +8,96 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\CashAccount;
+use App\Models\CashTransaction;
 
 class PurchasePaymentController extends Controller
 {
+    // 1. FORM PEMBAYARAN
     public function create($id)
     {
         // Load PO beserta history pembayarannya
         $purchase = Purchase::with(['supplier', 'payments.user'])->findOrFail($id);
         
+        // Cek jika sudah lunas
         if ($purchase->payment_status == 'paid') {
-            return back()->with('error', 'PO ini sudah lunas!');
+            return back()->with('error', 'PO ini sudah lunas sepenuhnya!');
         }
 
-        return view('purchases.payment', compact('purchase'));
+        // AMBIL DATA AKUN KAS/BANK UNTUK DROPDOWN
+        $accounts = CashAccount::orderBy('name')->get();
+
+        return view('purchases.payment', compact('purchase', 'accounts'));
     }
 
+    // 2. SIMPAN PEMBAYARAN & UPDATE KEUANGAN
     public function store(Request $request)
     {
         $request->validate([
             'purchase_id' => 'required|exists:purchases,id',
+            'cash_account_id' => 'required|exists:cash_accounts,id', // Validasi Akun
             'amount' => 'required|numeric|min:1',
             'date' => 'required|date',
-            'payment_method' => 'required|string',
-            'reference_number' => 'nullable|string', // Kolom baru (Opsional)
         ]);
 
-        $po = Purchase::findOrFail($request->purchase_id);
-        $sisaHutang = $po->total_amount - $po->amount_paid;
+        $purchase = Purchase::findOrFail($request->purchase_id);
+        $account = CashAccount::findOrFail($request->cash_account_id);
 
-        if ($request->amount > $sisaHutang) {
-            return back()->with('error', 'Jumlah bayar melebihi sisa hutang!');
+        // 1. Validasi: Jangan bayar lebih dari sisa hutang
+        $remainingDebt = $purchase->total_amount - $purchase->amount_paid;
+        
+        // Toleransi pembulatan 1 rupiah agar tidak error karena floating point
+        if ($request->amount > ($remainingDebt + 1)) {
+            return back()->with('error', 'Jumlah pembayaran melebihi sisa hutang! Sisa: Rp ' . number_format($remainingDebt, 0));
         }
 
-        DB::transaction(function () use ($request, $po) {
-            // 1. SIMPAN HISTORY PEMBAYARAN (TRACKING)
+        // 2. Validasi: Cek Saldo Akun Cukup Gak?
+        if ($account->balance < $request->amount) {
+            return back()->with('error', 'Saldo akun ' . $account->name . ' tidak mencukupi! Saldo: Rp ' . number_format($account->balance, 0));
+        }
+
+        DB::transaction(function () use ($request, $purchase, $account) {
+            // A. UPDATE PURCHASE (HUTANG) - Catat Payment
             PurchasePayment::create([
-                'purchase_id' => $po->id,
-                'user_id' => Auth::id(), // Mencatat siapa yang bayar
-                'date' => $request->date,
+                'purchase_id' => $purchase->id,
+                'user_id' => Auth::id(),
                 'amount' => $request->amount,
-                'payment_method' => $request->payment_method,
-                'notes' => 'Pembayaran Hutang PO ' . $po->po_number,
+                'date' => $request->date,
+                // Kita simpan nama akun sebagai payment_method agar history jelas
+                'payment_method' => $account->name, 
+                'notes' => $request->notes,
             ]);
 
-            // 2. UPDATE TOTAL DI PO (Induk)
-            $po->amount_paid += $request->amount;
-
-            if ($po->amount_paid >= ($po->total_amount - 1)) {
-                $po->payment_status = 'paid';
+            // Update Total Terbayar di PO
+            $purchase->amount_paid += $request->amount;
+            
+            // Cek Status Lunas (Toleransi floating point 1 rupiah)
+            if ($purchase->amount_paid >= ($purchase->total_amount - 1)) {
+                $purchase->payment_status = 'paid';
             } else {
-                $po->payment_status = 'partial';
+                $purchase->payment_status = 'partial';
             }
-            $po->save();
+            $purchase->save();
+
+            // B. UPDATE FINANCE (KAS KELUAR) - Catat Transaksi
+            CashTransaction::create([
+                'cash_account_id' => $account->id,
+                'user_id' => Auth::id(),
+                'type' => 'out', // Uang Keluar
+                'amount' => $request->amount,
+                'date' => $request->date,
+                'description' => 'Pembayaran Hutang PO: ' . $purchase->po_number . ' (' . $purchase->supplier->name . ')',
+                'reference_id' => 'PO-' . $purchase->id,
+            ]);
+
+            // C. POTONG SALDO AKUN
+            $account->decrement('balance', $request->amount);
         });
 
-        return redirect()->route('purchases.show', $po->id)
-            ->with('success', 'Pembayaran berhasil dicatat & masuk history.');
+        return redirect()->route('purchases.index')->with('success', 'Pembayaran berhasil dicatat & Saldo ' . $account->name . ' telah dipotong.');
     }
 
+    // 3. CETAK BUKTI PEMBAYARAN (VOUCHER)
     public function print($id)
     {
         $payment = PurchasePayment::with(['purchase.supplier', 'user'])->findOrFail($id);
