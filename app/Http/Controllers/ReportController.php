@@ -9,12 +9,16 @@ use App\Models\User;
 use App\Models\SalesOrder;
 use App\Models\Invoice;
 use App\Models\Customer;
-use App\Models\Supplier; // <--- Jangan lupa import ini
+use App\Models\Supplier;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\TransactionExport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
+use App\Models\CashTransaction;
+use App\Models\ExpenseCategory;
+use App\Models\Payment;
+use App\Models\PurchasePayment;
 
 class ReportController extends Controller
 {
@@ -360,5 +364,114 @@ class ReportController extends Controller
         }
 
         return $query->oldest();
+    }
+
+    // 11. LAPORAN LABA RUGI (PROFIT & LOSS)
+    public function profitLoss(Request $request)
+    {
+        $startDate = $request->start_date ?? date('Y-m-01');
+        $endDate = $request->end_date ?? date('Y-m-t');
+
+        // 1. HITUNG OMSET (REVENUE)
+        // Ambil semua invoice yang tidak dicancel
+        $invoices = Invoice::with(['details.product'])
+            ->whereBetween('date', [$startDate, $endDate])
+            ->where('status', '!=', 'canceled') 
+            ->get();
+
+        $totalRevenue = $invoices->sum('total_amount');
+
+        // 2. HITUNG HPP (COGS - Cost of Goods Sold)
+        // Rumus: Qty Terjual * Harga Beli Produk (Buy Price)
+        $totalCOGS = 0;
+        foreach ($invoices as $inv) {
+            foreach ($inv->details as $item) {
+                // Asumsi: Kita pakai harga beli saat ini dari master product
+                // (Untuk sistem advanced, seharusnya pakai FIFO/Average dari Batch stok)
+                $buyPrice = $item->product->buy_price ?? 0;
+                $totalCOGS += ($item->quantity * $buyPrice);
+            }
+        }
+
+        // 3. HITUNG LABA KOTOR (GROSS PROFIT)
+        $grossProfit = $totalRevenue - $totalCOGS;
+
+        // 4. HITUNG BIAYA OPERASIONAL (EXPENSES)
+        // Ambil transaksi tipe 'out' yang punya kategori (bukan transfer)
+        $expenses = CashTransaction::whereBetween('date', [$startDate, $endDate])
+            ->where('type', 'out')
+            ->whereNotNull('expense_category_id') // Hanya biaya, bukan mutasi/transfer
+            ->with('category')
+            ->selectRaw('expense_category_id, sum(amount) as total')
+            ->groupBy('expense_category_id')
+            ->get();
+
+        $totalExpenses = $expenses->sum('total');
+
+        // 5. LABA BERSIH (NET PROFIT)
+        $netProfit = $grossProfit - $totalExpenses;
+
+        // Jika minta PDF
+        if ($request->has('export') && $request->export == 'pdf') {
+            $pdf = Pdf::loadView('reports.profit_loss_pdf', compact('startDate', 'endDate', 'totalRevenue', 'totalCOGS', 'grossProfit', 'expenses', 'totalExpenses', 'netProfit'));
+            return $pdf->stream('Laba-Rugi-'.$startDate.'-sd-'.$endDate.'.pdf');
+        }
+
+        return view('reports.profit_loss', compact('startDate', 'endDate', 'totalRevenue', 'totalCOGS', 'grossProfit', 'expenses', 'totalExpenses', 'netProfit'));
+    }
+
+    // 12. LAPORAN ARUS KAS (CASH FLOW)
+    public function cashFlow(Request $request)
+    {
+        $startDate = $request->start_date ?? date('Y-m-01');
+        $endDate = $request->end_date ?? date('Y-m-t');
+
+        // 1. HITUNG SALDO AWAL (BEGINNING BALANCE)
+        // Rumus: Total semua transaksi SEBELUM start_date
+        // Ini agak kompleks, kita simplifikasi: Ambil saldo akun saat ini, lalu kurangi transaksi yang terjadi setelah start_date?
+        // Cara paling akurat: Hitung maju dari saldo 0 sejak awal sistem.
+        
+        // A. Saldo Awal Akun (Total Cash on Hand saat start_date)
+        // Kita hitung manual dari history transaksi s/d sebelum start_date
+        $initialCash = \App\Models\CashAccount::sum('balance'); 
+        // Note: Cara di atas adalah saldo SAAT INI. Untuk dapat saldo MASA LALU, kita harus:
+        // Saldo Awal = Saldo Sekarang - (Mutasi Masuk Periode Ini) + (Mutasi Keluar Periode Ini) + (Mutasi Masuk Setelah Periode Ini) ...
+        // Untuk simplifikasi di tutorial ini, kita hitung mutasi periode ini saja, lalu Saldo Akhir = Saldo Awal + Mutasi.
+        
+        // Agar tidak rumit, kita fokus pada ARUS KAS PERIODE INI (Inflow vs Outflow) saja dulu.
+        
+        // 2. ARUS KAS DARI OPERASIONAL (OPERATING ACTIVITIES)
+        
+        // A. Penerimaan dari Pelanggan (Sales)
+        $cashInSales = Payment::whereBetween('date', [$startDate, $endDate])->sum('amount');
+
+        // B. Pembayaran ke Supplier (Purchases)
+        $cashOutPurchase = PurchasePayment::whereBetween('date', [$startDate, $endDate])
+            ->where('payment_method', 'not like', '%Debit%') // Abaikan retur potong hutang (non-cash)
+            ->sum('amount');
+
+        // C. Biaya Operasional (Expenses)
+        $cashOutExpenses = CashTransaction::whereBetween('date', [$startDate, $endDate])
+            ->where('type', 'out')
+            ->whereNotNull('expense_category_id') // Hanya expense murni
+            ->sum('amount');
+
+        // D. Pemasukan Lain-lain (Other Income)
+        $cashInOthers = CashTransaction::whereBetween('date', [$startDate, $endDate])
+            ->where('type', 'in')
+            ->sum('amount');
+
+        // 3. HITUNG TOTAL
+        $totalIn = $cashInSales + $cashInOthers;
+        $totalOut = $cashOutPurchase + $cashOutExpenses;
+        $netCashFlow = $totalIn - $totalOut;
+
+        // Jika minta PDF
+        if ($request->has('export') && $request->export == 'pdf') {
+            $pdf = Pdf::loadView('reports.cash_flow_pdf', compact('startDate', 'endDate', 'cashInSales', 'cashInOthers', 'cashOutPurchase', 'cashOutExpenses', 'totalIn', 'totalOut', 'netCashFlow'));
+            return $pdf->stream('Arus-Kas-'.$startDate.'.pdf');
+        }
+
+        return view('reports.cash_flow', compact('startDate', 'endDate', 'cashInSales', 'cashInOthers', 'cashOutPurchase', 'cashOutExpenses', 'totalIn', 'totalOut', 'netCashFlow'));
     }
 }

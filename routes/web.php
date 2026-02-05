@@ -112,6 +112,32 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/invoices/{id}', 'show')->name('invoices.show');
     });
 
+    // --- MODUL KEUANGAN (CASH & BANK) ---
+    Route::prefix('finance')->middleware(['auth'])->group(function () {
+        // Dashboard
+        Route::get('/', [App\Http\Controllers\FinanceController::class, 'index'])->name('finance.index');
+        
+        // Kelola Akun (Dompet) - PENGATURAN BARU
+        Route::get('/accounts/create', [App\Http\Controllers\FinanceController::class, 'createAccount'])->name('finance.accounts.create'); // Halaman Form
+        Route::post('/accounts', [App\Http\Controllers\FinanceController::class, 'storeAccount'])->name('finance.accounts.store'); // Proses Simpan
+        Route::get('/accounts/{id}/edit', [App\Http\Controllers\FinanceController::class, 'editAccount'])->name('finance.accounts.edit'); // Halaman Edit
+        Route::patch('/accounts/{id}', [App\Http\Controllers\FinanceController::class, 'updateAccount'])->name('finance.accounts.update'); // Proses Update
+        Route::delete('/accounts/{id}', [App\Http\Controllers\FinanceController::class, 'destroyAccount'])->name('finance.accounts.destroy');
+        
+        // Kelola Kategori Biaya
+        Route::post('/categories', [App\Http\Controllers\FinanceController::class, 'storeCategory'])->name('finance.categories.store');
+        Route::delete('/categories/{id}', [App\Http\Controllers\FinanceController::class, 'destroyCategory'])->name('finance.categories.destroy');
+
+        // Transaksi Kas (Biaya / Pemasukan Lain)
+        Route::get('/transactions', [App\Http\Controllers\FinanceController::class, 'transactions'])->name('finance.transactions.index');
+        Route::get('/transactions/create', [App\Http\Controllers\FinanceController::class, 'createTransaction'])->name('finance.transactions.create');
+        Route::post('/transactions', [App\Http\Controllers\FinanceController::class, 'storeTransaction'])->name('finance.transactions.store');
+        
+        // Transfer / Mutasi Kas
+        Route::get('/transfer', [App\Http\Controllers\FinanceController::class, 'createTransfer'])->name('finance.transfer.create');
+        Route::post('/transfer', [App\Http\Controllers\FinanceController::class, 'storeTransfer'])->name('finance.transfer.store');
+    });
+
     // Route Bayar Hutang Supplier
     Route::get('/purchases/{id}/pay', [App\Http\Controllers\PurchasePaymentController::class, 'create'])->name('purchases.pay');
     Route::post('/purchases/pay', [App\Http\Controllers\PurchasePaymentController::class, 'store'])->name('purchases.payment.store');
@@ -187,6 +213,9 @@ Route::middleware(['auth'])->group(function () {
             // Hutang (AP) --> INI YANG BARU KITA INTEGRASIKAN
             Route::get('/debt', [App\Http\Controllers\ReportController::class, 'accountsPayable'])->name('reports.debt.index');
             Route::get('/debt/print', [App\Http\Controllers\ReportController::class, 'accountsPayablePrint'])->name('reports.debt.print');
+
+            Route::get('/reports/profit-loss', [App\Http\Controllers\ReportController::class, 'profitLoss'])->name('reports.profit_loss');
+            Route::get('/reports/cash-flow', [App\Http\Controllers\ReportController::class, 'cashFlow'])->name('reports.cash_flow');
         });
 
         // Open Hold Sales Order

@@ -130,13 +130,13 @@
                 <span x-show="isExpanded" x-cloak class="text-sm font-medium whitespace-nowrap">Pengiriman</span>
                 <div x-show="!isExpanded" x-cloak class="fixed left-16 ml-2 bg-slate-900 text-white text-xs px-2 py-1.5 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[60] pointer-events-none border border-slate-700">Pengiriman</div>
             </a>
+            
             <a href="{{ route('returns.index') }}" 
-                class="flex items-center gap-3 py-2.5 rounded-lg transition-colors group relative shrink-0 {{ request()->routeIs('returns.*') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}"
-                :class="isExpanded ? 'px-3' : 'w-10 justify-center px-0'">
+               class="flex items-center gap-3 py-2.5 rounded-lg transition-colors group relative shrink-0 {{ request()->routeIs('returns.*') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}"
+               :class="isExpanded ? 'px-3' : 'w-10 justify-center px-0'">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
-                    
                 <span x-show="isExpanded" x-cloak class="text-sm font-medium whitespace-nowrap">Retur Penjualan</span>
-                <div x-show="!isExpanded" x-cloak class="fixed left-16 ml-2 bg-slate-900 text-white text-xs px-2 py-1.5 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[60] pointer-events-none border border-slate-700">Retur</div>
+                <div x-show="!isExpanded" x-cloak class="fixed left-16 ml-2 bg-slate-900 text-white text-xs px-2 py-1.5 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[60] pointer-events-none border border-slate-700">Retur Penjualan</div>
             </a>
 
             <div x-show="isExpanded" x-cloak class="mt-6 mb-2 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
@@ -144,6 +144,7 @@
             </div>
             <div x-show="!isExpanded" x-cloak class="my-2 border-t border-slate-700 w-6 shrink-0"></div>
 
+            {{-- MENU INVOICE --}}
             <a href="{{ route('invoices.index') }}" 
                class="flex items-center gap-3 py-2.5 rounded-lg transition-colors group relative shrink-0
                {{ request()->routeIs('invoices.*') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}"
@@ -151,6 +152,16 @@
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 <span x-show="isExpanded" x-cloak class="text-sm font-medium whitespace-nowrap">Invoice</span>
                 <div x-show="!isExpanded" x-cloak class="fixed left-16 ml-2 bg-slate-900 text-white text-xs px-2 py-1.5 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[60] pointer-events-none border border-slate-700">Invoice</div>
+            </a>
+
+            {{-- MENU KAS & BANK (BARU) --}}
+            <a href="{{ route('finance.index') }}" 
+               class="flex items-center gap-3 py-2.5 rounded-lg transition-colors group relative shrink-0
+               {{ request()->routeIs('finance.*') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}"
+               :class="isExpanded ? 'px-3' : 'w-10 justify-center px-0'">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"></path></svg>
+                <span x-show="isExpanded" x-cloak class="text-sm font-medium whitespace-nowrap">Kas & Bank</span>
+                <div x-show="!isExpanded" x-cloak class="fixed left-16 ml-2 bg-slate-900 text-white text-xs px-2 py-1.5 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[60] pointer-events-none border border-slate-700">Kas & Bank</div>
             </a>
 
             @if(Auth::user()->role === 'admin')

@@ -60,5 +60,23 @@
             <p class="text-sm text-slate-500 mt-2">Kartu riwayat detail hutang supplier (Rekening Koran).</p>
         </a>
 
+        {{-- 7. LABA RUGI (PROFIT & LOSS) --}}
+        <a href="{{ route('reports.profit_loss') }}" class="block p-6 bg-white border border-slate-200 rounded-xl hover:shadow-lg hover:border-emerald-500 transition-all group">
+            <div class="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 group-hover:text-emerald-600">Laporan Laba Rugi</h3>
+            <p class="text-sm text-slate-500 mt-2">Analisa profitabilitas: Penjualan dikurangi HPP dan Biaya.</p>
+        </a>
+
+        {{-- 8. ARUS KAS (CASH FLOW) --}}
+        <a href="{{ route('reports.cash_flow') }}" class="block p-6 bg-white border border-slate-200 rounded-xl hover:shadow-lg hover:border-blue-500 transition-all group">
+            <div class="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 group-hover:text-blue-600">Laporan Arus Kas</h3>
+            <p class="text-sm text-slate-500 mt-2">Analisa aliran uang masuk (Cash In) & keluar (Cash Out).</p>
+        </a>
+
     </div>
 </x-app-layout>
