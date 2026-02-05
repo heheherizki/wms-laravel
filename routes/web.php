@@ -63,12 +63,20 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/customers/{id}/statement', [StatementController::class, 'index'])->name('customers.statement');
 
     // --- INVENTORY (PRODUCTS & TRANSACTIONS) ---
+    
+    // 1. Route Produk (CRUD & History)
     Route::controller(ProductController::class)->group(function () {
         Route::get('/products', 'index')->name('products.index');
+        Route::get('/products/create', 'create')->name('products.create');
+        Route::post('/products', 'store')->name('products.store');
+        Route::get('/products/{id}/edit', 'edit')->name('products.edit');
+        Route::put('/products/{id}', 'update')->name('products.update');
         Route::get('/products/{id}/history', 'history')->name('products.history');
         Route::get('/products/{id}/barcode', 'printBarcode')->name('products.barcode');
+        Route::delete('/products/{id}', 'destroy')->name('products.destroy');
     });
 
+    // 2. Route Transaksi Cepat (Masuk & Keluar) - INI YANG HILANG
     Route::controller(TransactionController::class)->group(function () {
         Route::post('/products/in', 'storeIn')->name('products.in');
         Route::post('/products/out', 'storeOut')->name('products.out');
@@ -181,12 +189,6 @@ Route::middleware(['auth'])->group(function () {
 
         // --- DELETE ACTIONS ---
         Route::delete('/payments/{id}', [PaymentController::class, 'destroy'])->name('payments.destroy');
-        // Product Management (Create/Update/Delete khusus Admin)
-        Route::controller(ProductController::class)->group(function () {
-            Route::post('/products', 'store')->name('products.store');
-            Route::put('/products/{id}', 'update')->name('products.update');
-            Route::delete('/products/{id}', 'destroy')->name('products.destroy');
-        });
 
         // --- SYSTEM MAINTENANCE ---
         Route::controller(BackupController::class)->group(function() {
