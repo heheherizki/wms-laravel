@@ -53,14 +53,16 @@
             </div>
 
             {{-- 3. Pending Orders --}}
-            <div class="relative bg-white p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden group hover:border-orange-300 transition-all cursor-pointer" onclick="window.location='{{ route('sales.index') }}'">
+            <div class="relative bg-white p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden group hover:border-orange-300 transition-all cursor-pointer" 
+                onclick="window.location='{{ route('sales.index', ['status' => ['pending', 'partial']]) }}'">
+                
                 <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                     <svg class="w-24 h-24 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
                 <div class="relative z-10">
                     <p class="text-xs font-bold text-orange-600 uppercase tracking-wider">Order Perlu Proses</p>
                     <h3 class="text-2xl font-bold text-slate-800 mt-2">{{ $pendingOrders }}</h3>
-                    <p class="text-xs text-slate-400 mt-1 group-hover:text-orange-600">Pending / Partial Ship</p>
+                    <p class="text-xs text-slate-400 mt-1 group-hover:text-orange-600">Pending & Partial Ship</p>
                 </div>
             </div>
 

@@ -14,10 +14,59 @@ use Barryvdh\DomPDF\Facade\Pdf;
 class SalesOrderController extends Controller
 {
     // 1. TAMPILKAN LIST SALES
-    public function index()
+    public function index(Request $request)
     {
-        $orders = SalesOrder::with(['customer', 'user'])->latest()->paginate(10);
-        return view('sales.index', compact('orders'));
+        // 1. Siapkan Query Dasar & Eager Loading (biar ringan)
+        $query = SalesOrder::with(['customer', 'user']);
+
+        // 2. Filter Pencarian (No SO atau Nama Customer)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('so_number', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function($c) use ($search) {
+                      $c->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // 3. Filter Status Order (UPGRADE: Support Multi-select Array)
+        // Ini menangani input dari Dashboard (klik kartu) maupun Filter manual
+        if ($request->filled('status')) {
+            // Cek apakah inputnya array (checkbox) atau string (dropdown biasa)
+            // Jika string, bungkus jadi array agar bisa masuk ke whereIn
+            $statuses = is_array($request->status) ? $request->status : [$request->status];
+            
+            // Gunakan whereIn untuk mencocokkan salah satu dari status yang dipilih
+            $query->whereIn('status', $statuses);
+        }
+
+        // 4. Filter Status Pembayaran
+        if ($request->filled('payment_status')) {
+            $query->where('payment_status', $request->payment_status);
+        }
+
+        // 5. Filter Rentang Tanggal
+        if ($request->filled('start_date')) {
+            $query->whereDate('date', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $query->whereDate('date', '<=', $request->end_date);
+        }
+
+        // 6. Eksekusi Data (Pagination)
+        // withQueryString() wajib ada agar filter tidak hilang saat klik halaman 2, 3, dst.
+        $orders = $query->latest()->paginate(10)->withQueryString();
+
+        // 7. Statistik Ringkas (Untuk Kartu di Header Halaman)
+        // Kita hitung global stat (tanpa filter query user) agar admin tetap tahu kondisi umum
+        $stats = [
+            'today_count'  => SalesOrder::whereDate('date', now())->count(),
+            'pending_ship' => SalesOrder::whereIn('status', ['pending', 'partial'])->count(), // Gabungan Pending & Partial
+            'unpaid_count' => SalesOrder::whereIn('payment_status', ['unpaid', 'partial'])->count(), // Yang belum lunas total
+        ];
+
+        return view('sales.index', compact('orders', 'stats'));
     }
 
     // 2. FORM BUAT ORDER BARU
