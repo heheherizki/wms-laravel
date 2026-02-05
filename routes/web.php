@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 
-// Import Controllers agar kode lebih bersih
+// --- IMPORT CONTROLLERS ---
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
@@ -12,11 +12,17 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\PurchaseReturnController;
+use App\Http\Controllers\PurchasePaymentController;
 use App\Http\Controllers\SalesOrderController;
+use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\ShipmentController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\ReportController;
-use App\Http\Controllers\PurchasePaymentController;
+use App\Http\Controllers\StatementController;
+use App\Http\Controllers\BackupController;
 
 /*
 |--------------------------------------------------------------------------
@@ -25,7 +31,7 @@ use App\Http\Controllers\PurchasePaymentController;
 */
 
 // =========================================================================
-// 1. GUEST / AUTHENTICATION
+// 1. GUEST (LOGIN & LOGOUT)
 // =========================================================================
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
@@ -36,68 +42,78 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->n
 
 
 // =========================================================================
-// 2. PROTECTED ROUTES (STAFF & ADMIN)
+// 2. MAIN APPLICATION (AUTHENTICATED USERS)
 // =========================================================================
 Route::middleware(['auth'])->group(function () {
 
-    // --- DASHBOARD ---
+    // --- DASHBOARD & PROFILE ---
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
-    // --- PROFILE ---
     Route::controller(ProfileController::class)->group(function () {
         Route::get('/profile', 'edit')->name('profile.edit');
         Route::patch('/profile', 'update')->name('profile.update');
         Route::put('/profile/password', 'updatePassword')->name('profile.password');
     });
 
-    // --- MASTER DATA (READ/WRITE for Staff) ---
+    // --- MASTER DATA (GENERAL ACCESS) ---
+    // Note: Delete action mungkin perlu diproteksi di view/controller jika staff dilarang hapus
     Route::resource('suppliers', SupplierController::class);
     Route::resource('customers', CustomerController::class);
+    Route::get('/customers/{id}/statement', [StatementController::class, 'index'])->name('customers.statement');
 
-    // --- PRODUCTS (READ ONLY for Staff) ---
-    // Staff bisa lihat history dan print barcode, tapi tidak bisa hapus/edit master
+    // --- INVENTORY (PRODUCTS & TRANSACTIONS) ---
     Route::controller(ProductController::class)->group(function () {
         Route::get('/products', 'index')->name('products.index');
         Route::get('/products/{id}/history', 'history')->name('products.history');
         Route::get('/products/{id}/barcode', 'printBarcode')->name('products.barcode');
     });
 
-    // --- TRANSACTIONS (STOCK IN/OUT) ---
     Route::controller(TransactionController::class)->group(function () {
         Route::post('/products/in', 'storeIn')->name('products.in');
         Route::post('/products/out', 'storeOut')->name('products.out');
     });
 
-    // --- PURCHASING (PEMBELIAN / PO) ---
+    // --- PURCHASING (PO & RETURNS) ---
     Route::resource('purchases', PurchaseController::class);
     Route::controller(PurchaseController::class)->group(function () {
         Route::patch('/purchases/{id}/complete', 'markAsCompleted')->name('purchases.complete');
         Route::get('/purchases/{id}/print', 'print')->name('purchases.print');
+        Route::get('/purchases/{id}/receive', 'receive')->name('purchases.receive'); // Form Terima
+        Route::post('/purchases/{id}/receive', 'processReceive')->name('purchases.receive.store'); // Proses Terima
     });
-    Route::get('/reports/statement', [App\Http\Controllers\ReportController::class, 'supplierStatement'])->name('reports.statement');
 
-    // RETUR PEMBELIAN (PURCHASE RETURN)
-    Route::resource('purchase_returns', App\Http\Controllers\PurchaseReturnController::class);
-    Route::patch('/purchase_returns/{id}/approve', [App\Http\Controllers\PurchaseReturnController::class, 'approve'])->name('purchase_returns.approve');
-    Route::patch('/purchase_returns/{id}/reject', [App\Http\Controllers\PurchaseReturnController::class, 'reject'])->name('purchase_returns.reject');
-    Route::get('/purchase_returns/{id}/print', [App\Http\Controllers\PurchaseReturnController::class, 'print'])->name('purchase_returns.print');
-    Route::get('/api/purchases/{id}/items', [App\Http\Controllers\PurchaseReturnController::class, 'getReceivedProducts']); // API untuk Form
+    // Purchase Payments (Hutang)
+    Route::controller(PurchasePaymentController::class)->group(function() {
+        Route::get('/purchases/{id}/pay', 'create')->name('purchases.pay');
+        Route::post('/purchase-payments', 'store')->name('purchase_payments.store');
+        Route::get('/purchases/payments/{id}/print', 'print')->name('purchases.payments.print');
+    });
 
-    // --- SALES (PENJUALAN / SO) ---
+    // Purchase Returns
+    Route::resource('purchase_returns', PurchaseReturnController::class);
+    Route::controller(PurchaseReturnController::class)->group(function() {
+        Route::get('/purchase_returns/{id}/print', 'print')->name('purchase_returns.print');
+        Route::get('/api/purchases/{id}/items', 'getReceivedProducts');
+        // Approval actions dipindah ke Admin Section di bawah
+    });
+
+    // --- SALES (SO & RETURNS) ---
     Route::resource('sales', SalesOrderController::class);
     Route::controller(SalesOrderController::class)->group(function () {
-    Route::patch('/sales/{id}/ship', 'markAsShipped')->name('sales.ship'); // Legacy full ship
-    Route::get('/sales/{id}/print-so', 'printSo')->name('sales.print_so'); // Picking List
-        // Route print invoice/shipment lama bisa dihapus jika sudah pindah ke modul baru,
-        // atau dibiarkan untuk kompatibilitas data lama.
-    
-    // Route untuk cek ulang status per Order
-    Route::patch('/sales/{id}/refresh', [\App\Http\Controllers\SalesOrderController::class, 'refreshStatus'])->name('sales.refresh');    
-
+        Route::patch('/sales/{id}/ship', 'markAsShipped')->name('sales.ship');
+        Route::get('/sales/{id}/print-so', 'printSo')->name('sales.print_so');
+        Route::patch('/sales/{id}/refresh', 'refreshStatus')->name('sales.refresh');
     });
 
-    // --- SHIPMENT (PENGIRIMAN PARTIAL) ---
+    // Sales Returns
+    Route::resource('returns', SalesReturnController::class);
+    Route::controller(SalesReturnController::class)->group(function() {
+        Route::get('/returns/{id}/print', 'print')->name('returns.print');
+        Route::get('/api/sales/{id}/shipped-items', 'getShippedProducts');
+    });
+
+    // --- LOGISTICS (SHIPMENTS) ---
     Route::controller(ShipmentController::class)->group(function () {
         Route::get('/shipments', 'index')->name('shipments.index');
         Route::get('/sales/{id}/shipment/create', 'create')->name('shipments.create');
@@ -105,7 +121,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/shipments/{id}/print', 'print')->name('shipments.print');
     });
 
-    // --- INVOICE (KEUANGAN) ---
+    // --- FINANCE (INVOICES & PAYMENTS) ---
     Route::controller(InvoiceController::class)->group(function () {
         Route::get('/invoices', 'index')->name('invoices.index');
         Route::post('/shipments/{id}/create-invoice', 'createFromShipment')->name('invoices.createFromShipment');
@@ -113,122 +129,93 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/invoices/{id}', 'show')->name('invoices.show');
     });
 
-    // --- MODUL KEUANGAN (CASH & BANK) ---
-    Route::prefix('finance')->middleware(['auth'])->group(function () {
-        // Dashboard
-        Route::get('/', [App\Http\Controllers\FinanceController::class, 'index'])->name('finance.index');
-        
-        // Kelola Akun (Dompet) - PENGATURAN BARU
-        Route::get('/accounts/create', [App\Http\Controllers\FinanceController::class, 'createAccount'])->name('finance.accounts.create'); // Halaman Form
-        Route::post('/accounts', [App\Http\Controllers\FinanceController::class, 'storeAccount'])->name('finance.accounts.store'); // Proses Simpan
-        Route::get('/accounts/{id}/edit', [App\Http\Controllers\FinanceController::class, 'editAccount'])->name('finance.accounts.edit'); // Halaman Edit
-        Route::patch('/accounts/{id}', [App\Http\Controllers\FinanceController::class, 'updateAccount'])->name('finance.accounts.update'); // Proses Update
-        Route::delete('/accounts/{id}', [App\Http\Controllers\FinanceController::class, 'destroyAccount'])->name('finance.accounts.destroy');
-        
-        // Kelola Kategori Biaya
-        Route::post('/categories', [App\Http\Controllers\FinanceController::class, 'storeCategory'])->name('finance.categories.store');
-        Route::delete('/categories/{id}', [App\Http\Controllers\FinanceController::class, 'destroyCategory'])->name('finance.categories.destroy');
-
-        // Transaksi Kas (Biaya / Pemasukan Lain)
-        Route::get('/transactions', [App\Http\Controllers\FinanceController::class, 'transactions'])->name('finance.transactions.index');
-        Route::get('/transactions/create', [App\Http\Controllers\FinanceController::class, 'createTransaction'])->name('finance.transactions.create');
-        Route::post('/transactions', [App\Http\Controllers\FinanceController::class, 'storeTransaction'])->name('finance.transactions.store');
-        
-        // Transfer / Mutasi Kas
-        Route::get('/transfer', [App\Http\Controllers\FinanceController::class, 'createTransfer'])->name('finance.transfer.create');
-        Route::post('/transfer', [App\Http\Controllers\FinanceController::class, 'storeTransfer'])->name('finance.transfer.store');
+    Route::controller(PaymentController::class)->group(function() {
+        Route::get('/invoices/{id}/payment/create', 'create')->name('payments.create');
+        Route::post('/payments', 'store')->name('payments.store');
+        Route::get('/payments/{id}/print', 'print')->name('payments.print');
     });
 
-    // Route Bayar Hutang Supplier
-    Route::get('/purchases/{id}/pay', [App\Http\Controllers\PurchasePaymentController::class, 'create'])->name('purchases.pay');
-    Route::post('/purchases/pay', [App\Http\Controllers\PurchasePaymentController::class, 'store'])->name('purchases.payment.store');
-    Route::get('/purchases/payments/{id}/print', [App\Http\Controllers\PurchasePaymentController::class, 'print'])->name('purchases.payments.print');
-    // Route Terima Barang (Partial)
-    Route::get('/purchases/{id}/receive', [App\Http\Controllers\PurchaseController::class, 'receive'])->name('purchases.receive');
-    Route::post('/purchases/{id}/receive', [App\Http\Controllers\PurchaseController::class, 'processReceive'])->name('purchases.receive.store');
+    // --- CASH & BANK MANAGEMENT ---
+    Route::prefix('finance')->group(function () {
+        Route::controller(FinanceController::class)->group(function() {
+            // Dashboard & Akun
+            Route::get('/', 'index')->name('finance.index');
+            Route::get('/accounts/create', 'createAccount')->name('finance.accounts.create');
+            Route::post('/accounts', 'storeAccount')->name('finance.accounts.store');
+            Route::get('/accounts/{id}/edit', 'editAccount')->name('finance.accounts.edit');
+            Route::patch('/accounts/{id}', 'updateAccount')->name('finance.accounts.update');
+            Route::delete('/accounts/{id}', 'destroyAccount')->name('finance.accounts.destroy');
+            
+            // Kategori
+            Route::post('/categories', 'storeCategory')->name('finance.categories.store');
+            Route::delete('/categories/{id}', 'destroyCategory')->name('finance.categories.destroy');
 
-    // Customer Statement
-    Route::get('/customers/{id}/statement', [\App\Http\Controllers\StatementController::class, 'index'])->name('customers.statement');
-
-    // --- SALES RETURN (RETUR PENJUALAN) ---
-    Route::resource('returns', \App\Http\Controllers\SalesReturnController::class);
-
-    // API Helper untuk Retur (Ambil produk shipped per SO)
-    Route::get('/returns/{id}/print', [\App\Http\Controllers\SalesReturnController::class, 'print'])->name('returns.print');
-    Route::get('/api/sales/{id}/shipped-items', [\App\Http\Controllers\SalesReturnController::class, 'getShippedProducts']);
-    
-    // Route khusus untuk Approve/Reject (Hanya Admin yang boleh)
-    Route::middleware(['admin'])->group(function () {
-        Route::patch('/returns/{id}/approve', [\App\Http\Controllers\SalesReturnController::class, 'approve'])->name('returns.approve');
-        Route::patch('/returns/{id}/reject', [\App\Http\Controllers\SalesReturnController::class, 'reject'])->name('returns.reject');
+            // Transaksi (Expense/Income)
+            Route::get('/transactions', 'transactions')->name('finance.transactions.index');
+            Route::get('/transactions/create', 'createTransaction')->name('finance.transactions.create');
+            Route::post('/transactions', 'storeTransaction')->name('finance.transactions.store');
+            
+            // Mutasi (Transfer)
+            Route::get('/transfer', 'createTransfer')->name('finance.transfer.create');
+            Route::post('/transfer', 'storeTransfer')->name('finance.transfer.store');
+        });
     });
-
-    // --- PAYMENTS (PEMBAYARAN) ---
-    Route::get('/invoices/{id}/payment/create', [\App\Http\Controllers\PaymentController::class, 'create'])->name('payments.create');
-    Route::post('/payments', [\App\Http\Controllers\PaymentController::class, 'store'])->name('payments.store');
-    Route::get('/payments/{id}/print', [\App\Http\Controllers\PaymentController::class, 'print'])->name('payments.print');
-    // ROUTE PEMBAYARAN HUTANG (PURCHASE PAYMENTS)
-    // 1. Halaman Form Bayar
-    Route::get('/purchases/{id}/pay', [PurchasePaymentController::class, 'create'])->name('purchases.pay');
-    
-    // 2. Proses Simpan Bayar (INI YANG HILANG)
-    Route::post('/purchase-payments', [PurchasePaymentController::class, 'store'])->name('purchase_payments.store');
-
-    // Admin Only Delete Payment
-    Route::middleware(['admin'])->delete('/payments/{id}', [\App\Http\Controllers\PaymentController::class, 'destroy'])->name('payments.destroy');
 
 
     // =====================================================================
-    // 3. ADMIN ONLY ZONE (SENSITIVE ACTIONS)
+    // 3. ADMIN & SENSITIVE ACTIONS (PROTECTED BY ROLE)
     // =====================================================================
-    Route::middleware(['admin'])->group(function () {
+    // Middleware 'role:super_admin|admin' memastikan hanya role tersebut yang bisa akses
+    Route::middleware(['role:super_admin|admin'])->group(function () {
 
-        // USER MANAGEMENT
+        // --- USER MANAGEMENT ---
         Route::resource('users', UserController::class);
 
-        // SYSTEM BACKUP & RESTORE (BARU)
-        Route::controller(\App\Http\Controllers\BackupController::class)->group(function() {
-            Route::get('/system/maintenance', 'index')->name('system.backup'); // Halaman Utama
-            Route::get('/system/backup/download', 'download')->name('system.backup.download'); // Aksi Download
-            Route::post('/system/backup/restore', 'restore')->name('system.backup.restore'); // Aksi Upload
-        });
+        // --- APPROVALS & UNLOCKS ---
+        Route::patch('/sales/{id}/approve', [SalesOrderController::class, 'approve'])->name('sales.approve');
+        Route::patch('/purchase_returns/{id}/approve', [PurchaseReturnController::class, 'approve'])->name('purchase_returns.approve');
+        Route::patch('/purchase_returns/{id}/reject', [PurchaseReturnController::class, 'reject'])->name('purchase_returns.reject');
+        Route::patch('/returns/{id}/approve', [SalesReturnController::class, 'approve'])->name('returns.approve');
+        Route::patch('/returns/{id}/reject', [SalesReturnController::class, 'reject'])->name('returns.reject');
+        Route::patch('/customers/{id}/unlock', [CustomerController::class, 'unlock'])->name('customers.unlock');
 
-        // PRODUCT MANAGEMENT (CREATE, UPDATE, DELETE)
+        // --- DELETE ACTIONS ---
+        Route::delete('/payments/{id}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+        // Product Management (Create/Update/Delete khusus Admin)
         Route::controller(ProductController::class)->group(function () {
             Route::post('/products', 'store')->name('products.store');
             Route::put('/products/{id}', 'update')->name('products.update');
             Route::delete('/products/{id}', 'destroy')->name('products.destroy');
         });
 
-        // REPORTS & EXPORTS
+        // --- SYSTEM MAINTENANCE ---
+        Route::controller(BackupController::class)->group(function() {
+            Route::get('/system/maintenance', 'index')->name('system.backup');
+            Route::get('/system/backup/download', 'download')->name('system.backup.download');
+            Route::post('/system/backup/restore', 'restore')->name('system.backup.restore');
+        });
+
+        // --- ADVANCED REPORTS ---
         Route::controller(ReportController::class)->group(function () {
-            // Dashboard Laporan
             Route::get('/reports', 'index')->name('reports.index');
             
-            // Laporan Spesifik
+            // Operational Reports
             Route::get('/reports/history', 'history')->name('reports.history');
             Route::get('/reports/stock', 'stock')->name('reports.stock');
             Route::get('/reports/sales', 'sales')->name('reports.sales');
+            Route::get('/reports/statement', 'supplierStatement')->name('reports.statement');
 
-            // Export Actions
+            // Financial Reports
+            Route::get('/reports/receivables', 'accountsReceivable')->name('reports.receivables');
+            Route::get('/debt', 'accountsPayable')->name('reports.debt.index');
+            Route::get('/debt/print', 'accountsPayablePrint')->name('reports.debt.print');
+            Route::get('/reports/profit-loss', 'profitLoss')->name('reports.profit_loss');
+            Route::get('/reports/cash-flow', 'cashFlow')->name('reports.cash_flow');
+
+            // Exports
             Route::get('/reports/export/excel', 'exportExcel')->name('reports.export_excel');
             Route::get('/reports/export/pdf', 'exportPdf')->name('reports.export_pdf');
-
-            // Laporan Piutang
-            Route::get('/reports/receivables', 'accountsReceivable')->name('reports.receivables');
-
-            // Hutang (AP) --> INI YANG BARU KITA INTEGRASIKAN
-            Route::get('/debt', [App\Http\Controllers\ReportController::class, 'accountsPayable'])->name('reports.debt.index');
-            Route::get('/debt/print', [App\Http\Controllers\ReportController::class, 'accountsPayablePrint'])->name('reports.debt.print');
-
-            Route::get('/reports/profit-loss', [App\Http\Controllers\ReportController::class, 'profitLoss'])->name('reports.profit_loss');
-            Route::get('/reports/cash-flow', [App\Http\Controllers\ReportController::class, 'cashFlow'])->name('reports.cash_flow');
         });
-
-        // Open Hold Sales Order
-        Route::patch('/sales/{id}/approve', [\App\Http\Controllers\SalesOrderController::class, 'approve'])->name('sales.approve');
-
-        Route::patch('/customers/{id}/unlock', [\App\Http\Controllers\CustomerController::class, 'unlock'])->name('customers.unlock');
 
     }); // End Admin Middleware
 
