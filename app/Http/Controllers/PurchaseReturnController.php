@@ -17,13 +17,48 @@ use App\Models\PurchaseDetail;
 class PurchaseReturnController extends Controller
 {
     // 1. DAFTAR RETUR PEMBELIAN
-    public function index()
+    public function index(Request $request)
     {
-        $returns = PurchaseReturn::with(['purchase.supplier', 'user'])
-            ->latest()
-            ->paginate(10);
-            
-        return view('purchase_returns.index', compact('returns'));
+        // 1. Eager Loading Relasi
+        $query = PurchaseReturn::with(['purchase.supplier', 'user']);
+
+        // 2. Filter Pencarian (No Retur / Nama Supplier / No PO)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('id', 'like', "%{$search}%") // Asumsi ID dipakai sebagai No Retur
+                ->orWhereHas('purchase.supplier', function($s) use ($search) {
+                    $s->where('name', 'like', "%{$search}%");
+                })
+                ->orWhereHas('purchase', function($p) use ($search) {
+                    $p->where('po_number', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        // 3. Filter Status (Multi-select support jika mau, disini single select dulu agar simpel)
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // 4. Filter Tanggal
+        if ($request->filled('start_date')) {
+            $query->whereDate('date', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $query->whereDate('date', '<=', $request->end_date);
+        }
+
+        // 5. Eksekusi Data
+        $returns = $query->latest()->paginate(10)->withQueryString();
+
+        // 6. Statistik Ringkas
+        $stats = [
+            'pending_count' => PurchaseReturn::where('status', 'pending')->count(),
+            'today_count' => PurchaseReturn::whereDate('date', now())->count(),
+        ];
+
+        return view('purchase_returns.index', compact('returns', 'stats'));
     }
 
     // 2. FORM PENGAJUAN (Pilih PO)

@@ -15,13 +15,56 @@ use Barryvdh\DomPDF\Facade\Pdf;
 class PurchaseController extends Controller
 {
     // 1. TAMPILKAN DAFTAR PO
-    public function index()
+    public function index(Request $request)
     {
-        $purchases = Purchase::with(['supplier', 'user'])
-                        ->latest()
-                        ->paginate(10); 
+        // 1. Query Dasar & Eager Loading
+        $query = Purchase::with(['supplier', 'user']);
 
-        return view('purchases.index', compact('purchases'));
+        // 2. Filter Pencarian (No PO / Supplier)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('po_number', 'like', "%{$search}%")
+                ->orWhereHas('supplier', function($s) use ($search) {
+                    $s->where('name', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        // 3. Filter Status PO (Multi-select)
+        if ($request->filled('status')) {
+            $statuses = is_array($request->status) ? $request->status : [$request->status];
+            $query->whereIn('status', $statuses);
+        }
+
+        // 4. Filter Status Pembayaran
+        if ($request->filled('payment_status')) {
+            $query->where('payment_status', $request->payment_status);
+        }
+
+        // 5. Filter Tanggal
+        if ($request->filled('start_date')) {
+            $query->whereDate('date', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $query->whereDate('date', '<=', $request->end_date);
+        }
+
+        // 6. Eksekusi Data
+        $purchases = $query->latest()->paginate(10)->withQueryString();
+
+        // 7. Statistik Ringkas
+        $stats = [
+            'today_count' => Purchase::whereDate('date', now())->count(),
+            'pending_po' => Purchase::where('status', 'pending')->count(),
+            'total_debt' => Purchase::whereIn('payment_status', ['unpaid', 'partial'])
+                            ->get()
+                            ->sum(function($po) {
+                                return $po->total_amount - $po->amount_paid;
+                            }),
+        ];
+
+        return view('purchases.index', compact('purchases', 'stats'));
     }
 
     // 2. HALAMAN BUAT PO BARU

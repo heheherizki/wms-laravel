@@ -15,13 +15,48 @@ use Barryvdh\DomPDF\Facade\Pdf;
 class SalesReturnController extends Controller
 {
     // 1. DAFTAR RETUR
-    public function index()
+    public function index(Request $request)
     {
-        $returns = SalesReturn::with(['salesOrder.customer', 'user'])
-            ->latest()
-            ->paginate(10);
-            
-        return view('returns.index', compact('returns'));
+        // 1. Eager Loading Relasi
+        $query = SalesReturn::with(['salesOrder.customer', 'user']);
+
+        // 2. Filter Pencarian (No RMA / No SO / Customer)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('id', 'like', "%{$search}%") // Asumsi ID dipakai sebagai No RMA
+                ->orWhereHas('salesOrder', function($so) use ($search) {
+                    $so->where('so_number', 'like', "%{$search}%");
+                })
+                ->orWhereHas('salesOrder.customer', function($c) use ($search) {
+                    $c->where('name', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        // 3. Filter Status (Single Select)
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // 4. Filter Tanggal
+        if ($request->filled('start_date')) {
+            $query->whereDate('date', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $query->whereDate('date', '<=', $request->end_date);
+        }
+
+        // 5. Eksekusi Data
+        $returns = $query->latest()->paginate(10)->withQueryString();
+
+        // 6. Statistik Ringkas
+        $stats = [
+            'pending_count' => SalesReturn::where('status', 'pending')->count(),
+            'today_count' => SalesReturn::whereDate('date', now())->count(),
+        ];
+
+        return view('returns.index', compact('returns', 'stats'));
     }
 
     // 2. FORM PENGAJUAN

@@ -127,6 +127,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/sales/{id}/shipment/create', 'create')->name('shipments.create');
         Route::post('/sales/{id}/shipment', 'store')->name('shipments.store');
         Route::get('/shipments/{id}/print', 'print')->name('shipments.print');
+        Route::get('/shipments/{id}', 'show')->name('shipments.show');
     });
 
     // --- FINANCE (INVOICES & PAYMENTS) ---

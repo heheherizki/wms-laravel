@@ -145,15 +145,26 @@
                     </div>
                 </div>
 
-                <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end items-center gap-4">
-                    <div class="text-xs text-slate-500 text-right">
-                        * Stok fisik akan otomatis berkurang setelah disimpan.<br>
-                        * Status order akan update menjadi Partial / Shipped.
+                <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                    
+                    {{-- FITUR BARU: CHECKBOX AUTO INVOICE --}}
+                    <div class="flex items-center gap-2 bg-white border border-indigo-200 px-4 py-2 rounded-lg shadow-sm">
+                        <input type="checkbox" name="create_invoice" id="create_invoice" value="1" checked class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                        <label for="create_invoice" class="text-sm font-bold text-slate-700 cursor-pointer select-none">
+                            Otomatis Buat Invoice
+                        </label>
                     </div>
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-md transition-all flex items-center gap-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                        Konfirmasi Kirim Barang
-                    </button>
+
+                    <div class="flex items-center gap-4">
+                        <div class="text-xs text-slate-500 text-right hidden md:block">
+                            * Stok fisik otomatis berkurang.<br>
+                            * Status Order menjadi Partial/Shipped.
+                        </div>
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-md transition-all flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            Proses Pengiriman
+                        </button>
+                    </div>
                 </div>
             </div>
         </form>

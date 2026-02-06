@@ -262,7 +262,7 @@
                                     <a href="{{ route('products.barcode', $product->id) }}" target="_blank"
                                        class="p-1.5 text-slate-500 hover:bg-slate-100 rounded border border-slate-200 transition-colors" 
                                        title="Cetak Barcode">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4h2v-4zM6 8v5a3 3 0 003 3h1m0-4h2m4 0h2m-4-8h2m-2 4h2m-7 0H9m-2 4H5a2 2 0 01-2-2V9a2 2 0 012-2h2a2 2 0 012 2v2m7 11v1m0-11h2"></path></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5v14M7 5v14M11 5v14M15 5v14M17 5v14M21 5v14" /></svg>
                                     </a>
 
                                     {{-- Tombol History --}}

@@ -11,11 +11,44 @@ use Spatie\Permission\Models\Role; // Import Model Role Spatie
 class UserController extends Controller
 {
     // 1. INDEX: TAMPILKAN LIST USER
-    public function index()
+    public function index(Request $request)
     {
-        // Ambil user beserta role-nya
-        $users = User::with('roles')->orderBy('name')->get();
-        return view('users.index', compact('users'));
+        $query = User::with('roles');
+
+        // 1. Filter Pencarian
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        // 2. Filter Role
+        if ($request->filled('role')) {
+            $query->role($request->role);
+        }
+
+        $users = $query->latest()->paginate(10)->withQueryString();
+        
+        // Ambil daftar role yang ADA di database untuk dropdown
+        $roles = Role::pluck('name');
+
+        // 3. Statistik (PERBAIKAN: Hanya hitung role yang eksis)
+        $stats = [
+            'total' => User::count(),
+            // Cek apakah role 'admin' ada sebelum menghitung, atau hitung manual
+            // Disini kita gabung super_admin dan admin sebagai "Level Admin"
+            'admins' => User::whereHas('roles', function($q) {
+                $q->whereIn('name', ['super_admin', 'admin']);
+            })->count(),
+            
+            'staff' => User::whereHas('roles', function($q) {
+                $q->where('name', 'staff');
+            })->count(),
+        ];
+
+        return view('users.index', compact('users', 'roles', 'stats'));
     }
 
     // 2. CREATE: HALAMAN TAMBAH USER

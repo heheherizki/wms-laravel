@@ -8,10 +8,43 @@ use Illuminate\Http\Request;
 class CustomerController extends Controller
 {
     // 1. DAFTAR CUSTOMER
-    public function index()
+    public function index(Request $request)
     {
-        $customers = Customer::latest()->get();
-        return view('customers.index', compact('customers'));
+        $query = Customer::query();
+
+        // 1. Filter Pencarian
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('contact_person', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        // 2. Filter Status Kredit (DIHAPUS SEMENTARA karena 'current_debt' virtual)
+        // Jika ingin mengaktifkan filter ini, harus menggunakan whereHas ke tabel invoices/orders
+        // Untuk stabilitas, kita non-aktifkan query SQL ini agar tidak error.
+        
+        $customers = $query->orderBy('name')->paginate(10)->withQueryString();
+
+        // 3. Statistik (FIXED: Hitung Manual di PHP)
+        // Ambil hanya customer yang punya limit kredit untuk dihitung (agar lebih ringan)
+        $customersWithLimit = Customer::where('credit_limit', '>', 0)->get();
+        
+        $overLimitCount = $customersWithLimit->filter(function($cust) {
+            // Gunakan accessor model yang sudah ada logic-nya
+            return $cust->current_debt > $cust->credit_limit;
+        })->count();
+
+        $stats = [
+            'total' => Customer::count(),
+            'total_limit' => Customer::sum('credit_limit'),
+            'over_limit_count' => $overLimitCount, // Hasil hitungan PHP
+        ];
+
+        return view('customers.index', compact('customers', 'stats'));
     }
 
     // 2. FORM TAMBAH

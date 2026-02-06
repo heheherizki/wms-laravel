@@ -8,10 +8,39 @@ use Illuminate\Http\Request;
 class SupplierController extends Controller
 {
     // 1. HALAMAN INDEX
-    public function index()
+    public function index(Request $request)
     {
-        $suppliers = Supplier::latest()->get();
-        return view('suppliers.index', compact('suppliers'));
+        $query = Supplier::query();
+
+        // 1. Filter Pencarian
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('code', 'like', "%{$search}%")
+                ->orWhere('contact_person', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        // 2. Filter Termin Pembayaran
+        if ($request->filled('term')) {
+            if ($request->term == 'cash') {
+                $query->where('term_days', 0);
+            } elseif ($request->term == 'credit') {
+                $query->where('term_days', '>', 0);
+            }
+        }
+
+        $suppliers = $query->orderBy('name')->paginate(10)->withQueryString();
+
+        // 3. Statistik Sederhana
+        $stats = [
+            'total' => Supplier::count(),
+            'credit_suppliers' => Supplier::where('term_days', '>', 0)->count(),
+        ];
+
+        return view('suppliers.index', compact('suppliers', 'stats'));
     }
 
     // 2. HALAMAN FORM TAMBAH

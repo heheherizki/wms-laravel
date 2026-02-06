@@ -130,7 +130,7 @@
                 <template x-if="!isExpanded">
                     <div class="fixed left-20 bg-slate-800 text-white text-xs px-3 py-2 rounded-md shadow-2xl border border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[9999] pointer-events-none"
                          :style="'top: ' + (tooltipTop + 10) + 'px'">
-                        Penjualan Barang
+                        Sales Order
                     </div>
                 </template>
             </a>
@@ -151,7 +151,7 @@
                 <template x-if="!isExpanded">
                     <div class="fixed left-20 bg-slate-800 text-white text-xs px-3 py-2 rounded-md shadow-2xl border border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[9999] pointer-events-none"
                          :style="'top: ' + (tooltipTop + 10) + 'px'">
-                        Logistik Keluar
+                        Pengiriman Barang
                     </div>
                 </template>
             </a>
@@ -204,7 +204,7 @@
                 <template x-if="!isExpanded">
                     <div class="fixed left-20 bg-slate-800 text-white text-xs px-3 py-2 rounded-md shadow-2xl border border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[9999] pointer-events-none"
                          :style="'top: ' + (tooltipTop + 10) + 'px'">
-                        Tagihan Pelanggan
+                        Invoice
                     </div>
                 </template>
             </a>
@@ -279,7 +279,7 @@
                     <template x-if="!isExpanded">
                         <div class="fixed left-20 bg-slate-800 text-white text-xs px-3 py-2 rounded-md shadow-2xl border border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[9999] pointer-events-none"
                              :style="'top: ' + (tooltipTop + 10) + 'px'">
-                            Financial & Stock Report
+                            Pusat Laporan
                         </div>
                     </template>
                 </a>

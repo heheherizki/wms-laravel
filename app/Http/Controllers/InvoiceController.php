@@ -13,14 +13,56 @@ class InvoiceController extends Controller
     // 1. LIST INVOICE (Halaman Dashboard Invoice)
     public function index(Request $request)
     {
+        // 1. Eager Loading Relasi
         $query = Invoice::with(['salesOrder.customer', 'shipment']);
 
-        if ($request->status) {
-            $query->where('status', $request->status);
+        // 2. Filter Pencarian
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('invoice_number', 'like', "%{$search}%")
+                  ->orWhereHas('salesOrder.customer', function($c) use ($search) {
+                      $c->where('name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('shipment', function($s) use ($search) {
+                      $s->where('shipment_number', 'like', "%{$search}%");
+                  });
+            });
         }
 
-        $invoices = $query->latest()->paginate(10);
-        return view('invoices.index', compact('invoices'));
+        // 3. Filter Status Pembayaran
+        if ($request->filled('status')) {
+            $statuses = is_array($request->status) ? $request->status : [$request->status];
+            $query->whereIn('status', $statuses);
+        }
+
+        // 4. Filter Jatuh Tempo
+        if ($request->filled('due_date_start')) {
+            $query->whereDate('due_date', '>=', $request->due_date_start);
+        }
+        if ($request->filled('due_date_end')) {
+            $query->whereDate('due_date', '<=', $request->due_date_end);
+        }
+
+        // 5. Eksekusi Data
+        $invoices = $query->latest()->paginate(10)->withQueryString();
+
+        // 6. Statistik Keuangan Ringkas (FIXED)
+        // Kita hitung menggunakan operasi matematika di database: SUM(total - dibayar)
+        $stats = [
+            'unpaid_count' => Invoice::where('status', 'unpaid')->count(),
+            
+            'overdue_count' => Invoice::where('status', '!=', 'paid')
+                ->whereDate('due_date', '<', now())
+                ->count(),
+            
+            // PERBAIKAN: Hitung via PHP Collection agar tidak error SQL
+            'total_receivable' => Invoice::whereIn('status', ['unpaid', 'partial'])
+                ->get()
+                ->sum('remaining_balance'),
+        ];
+
+        return view('invoices.index', compact('invoices', 'stats'));
     }
 
     // 2. GENERATE INVOICE DARI SHIPMENT (Action)
